@@ -103,6 +103,9 @@ private let configParser: [String: any ParserProtocol<Config>] = [
 
     "start-at-login": Parser(\.startAtLogin, parseBool),
     "automatically-unhide-macos-hidden-apps": Parser(\.automaticallyUnhideMacosHiddenApps, parseBool),
+    "focus-follows-mouse": Parser<Config, Bool>(\.focusFollowsMouse, parseBool),
+    "focus-follows-mouse-ignore-menu-bar": Parser<Config, Bool>(\.focusFollowsMouseIgnoreMenuBar, parseBool),
+    "focus-follows-mouse-behavior": Parser<Config, FocusFollowsMouseBehavior>(\.focusFollowsMouseBehavior, parseFocusFollowsMouseBehavior),
     "accordion-padding": Parser(\.accordionPadding, parseInt),
     "exec-on-workspace-change": Parser(\.execOnWorkspaceChange, parseExecOnWorkspaceChange),
     "exec": Parser(\.execConfig, parseExecConfig),
@@ -299,6 +302,13 @@ private func parseDefaultContainerOrientation(_ raw: TOMLValueConvertible, _ bac
     parseString(raw, backtrace).flatMap {
         DefaultContainerOrientation(rawValue: $0)
             .orFailure(.semantic(backtrace, "Can't parse default container orientation '\($0)'"))
+    }
+}
+
+private func parseFocusFollowsMouseBehavior(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<FocusFollowsMouseBehavior> {
+    parseString(raw, backtrace).flatMap {
+        FocusFollowsMouseBehavior(rawValue: $0)
+            .orFailure(.semantic(backtrace, "Can't parse focus-follows-mouse-behavior '\($0)'. Valid values: \(FocusFollowsMouseBehavior.allCases.map(\.rawValue).joined(separator: ", "))"))
     }
 }
 

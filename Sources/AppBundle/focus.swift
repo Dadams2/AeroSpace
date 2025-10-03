@@ -77,7 +77,22 @@ struct FrozenFocus: AeroAny, Equatable, Sendable {
 extension Window {
     @MainActor func focusWindow() -> Bool {
         if let focus = toLiveFocusOrNil() {
-            return setFocus(to: focus)
+            let result = setFocus(to: focus)
+            if result {
+                // Track keyboard focus for focus-follows-mouse
+                if let rect = lastAppliedLayoutPhysicalRect {
+                    setFocusSource(.keyboard, windowRect: rect)
+                } else {
+                    Task {
+                        if let rect = try? await getAxRect() {
+                            await MainActor.run {
+                                setFocusSource(.keyboard, windowRect: rect)
+                            }
+                        }
+                    }
+                }
+            }
+            return result
         } else {
             // todo We should also exit-native-hidden/unminimize[/exit-native-fullscreen?] window if we want to fix ID-B6E178F2
             //      and retry to focus the window. Otherwise, it's not possible to focus minimized/hidden windows

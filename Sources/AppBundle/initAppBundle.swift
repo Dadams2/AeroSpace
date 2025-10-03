@@ -18,6 +18,7 @@ import Foundation
     checkAccessibilityPermissions()
     startUnixSocketServer()
     GlobalObserver.initObserver()
+    initFocusFollowsMouse()
     Task {
         Workspace.garbageCollectUnusedWorkspaces() // init workspaces
         _ = Workspace.all.first?.focusWorkspace()

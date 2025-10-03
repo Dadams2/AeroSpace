@@ -41,6 +41,9 @@ struct Config: ConvenienceCopyable {
     var defaultRootContainerOrientation: DefaultContainerOrientation = .auto
     var startAtLogin: Bool = false
     var automaticallyUnhideMacosHiddenApps: Bool = false
+    var focusFollowsMouse: Bool = false
+    var focusFollowsMouseIgnoreMenuBar: Bool = true
+    var focusFollowsMouseBehavior: FocusFollowsMouseBehavior = .crossBoundary
     var accordionPadding: Int = 30
     var enableNormalizationOppositeOrientationForNestedContainers: Bool = true
     var execOnWorkspaceChange: [String] = [] // todo deprecate
@@ -61,4 +64,9 @@ struct Config: ConvenienceCopyable {
 
 enum DefaultContainerOrientation: String {
     case horizontal, vertical, auto
+}
+
+enum FocusFollowsMouseBehavior: String, CaseIterable, Sendable {
+    case crossBoundary = "cross-boundary"  // Only when crossing window borders
+    case immediate = "immediate"           // On any mouse movement
 }

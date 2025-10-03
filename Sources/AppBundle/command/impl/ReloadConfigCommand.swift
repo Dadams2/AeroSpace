@@ -33,6 +33,10 @@ struct ReloadConfigCommand: Command {
                 configUrl = url
                 activateMode(activeMode)
                 syncStartAtLogin()
+
+                // Refresh focus-follows-mouse on config reload
+                runRefreshSession(.focusFollowsMouse)
+
                 MessageModel.shared.message = nil
             }
             return true
