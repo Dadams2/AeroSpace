@@ -18,13 +18,22 @@ enum FocusSource {
 
 @MainActor
 func initFocusFollowsMouse() {
-    guard config.focusFollowsMouse else { return }
+    print("Focus-follows-mouse: Initializing with config.focusFollowsMouse = \(config.focusFollowsMouse)")
+    print("Focus-follows-mouse: Behavior = \(config.focusFollowsMouseBehavior)")
+    print("Focus-follows-mouse: Ignore menu bar = \(config.focusFollowsMouseIgnoreMenuBar)")
+
+    guard config.focusFollowsMouse else {
+        print("Focus-follows-mouse: Disabled, not initializing")
+        return
+    }
 
     deinitFocusFollowsMouse() // Clean up any existing monitor
 
     mouseMoveMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { _ in
         handleMouseMoved()
     }
+
+    print("Focus-follows-mouse: Mouse monitor initialized")
 }
 
 @MainActor
@@ -39,23 +48,28 @@ func deinitFocusFollowsMouse() {
 @MainActor
 private func handleMouseMoved() {
     let currentMousePosition = mouseLocation
+    print("Focus-follows-mouse: Mouse moved to \(currentMousePosition)")
 
     // Skip if mouse hasn't moved significantly
-    guard currentMousePosition.distance(to: lastMousePosition) > 1 else { return }
-
-    // If focus-follows-mouse behavior is cross-boundary, check for boundary crossing
-    if config.focusFollowsMouseBehavior == .crossBoundary {
-        // If last focus was from keyboard and mouse is still in that window, ignore
-        if lastFocusSource == .keyboard,
-           let rect = keyboardFocusedWindowRect,
-           rect.contains(currentMousePosition) {
-            return
-        }
-
-        // Only proceed if mouse crossed window boundaries
-        guard hasMouseCrossedWindowBoundary(currentMousePosition) else { return }
+    guard currentMousePosition.distance(to: lastMousePosition) > 1 else { 
+        print("Focus-follows-mouse: Movement too small, skipping")
+        return 
     }
 
+    // For immediate mode, always proceed
+    // For cross-boundary mode, check for boundary crossing
+    var shouldProceed = true
+    if config.focusFollowsMouseBehavior == .crossBoundary {
+        shouldProceed = hasMouseCrossedWindowBoundary(currentMousePosition)
+        if !shouldProceed {
+            print("Focus-follows-mouse: No boundary crossing detected")
+            // Always update position even if no boundary crossing for next comparison
+            lastMousePosition = currentMousePosition
+            return
+        }
+    }
+
+    print("Focus-follows-mouse: Proceeding with focus change")
     lastMousePosition = currentMousePosition
 
     // Debounce rapid mouse movements
@@ -74,7 +88,28 @@ private func hasMouseCrossedWindowBoundary(_ point: CGPoint) -> Bool {
     let currentWindowUnderMouse = findWindowUnderMouse(at: point)
     let previousWindowUnderMouse = findWindowUnderMouse(at: lastMousePosition)
 
-    return currentWindowUnderMouse?.windowId != previousWindowUnderMouse?.windowId
+    print("Focus-follows-mouse: Current window under mouse: \(currentWindowUnderMouse?.windowId ?? 0), Previous window under mouse: \(previousWindowUnderMouse?.windowId ?? 0)")
+
+    // If we moved from a window to empty space, that's a boundary crossing
+    if previousWindowUnderMouse != nil && currentWindowUnderMouse == nil {
+        print("Focus-follows-mouse: Boundary crossed - window to empty space")
+        return true
+    }
+
+    // If we moved from empty space to a window, that's a boundary crossing
+    if previousWindowUnderMouse == nil && currentWindowUnderMouse != nil {
+        print("Focus-follows-mouse: Boundary crossed - empty space to window")
+        return true
+    }
+
+    // If we moved from one window to a different window, that's a boundary crossing
+    let boundaryChanged = currentWindowUnderMouse?.windowId != previousWindowUnderMouse?.windowId
+    if boundaryChanged {
+        print("Focus-follows-mouse: Boundary crossed - different windows")
+    } else {
+        print("Focus-follows-mouse: No boundary crossing - same window or both empty")
+    }
+    return boundaryChanged
 }
 
 @MainActor
@@ -98,23 +133,44 @@ private func isActuallyManipulatingWindow() -> Bool {
 
 @MainActor
 private func focusWindowUnderMouse(at point: CGPoint) async {
-    guard let token: RunSessionGuard = .isServerEnabled else { return }
+    print("Focus-follows-mouse: focusWindowUnderMouse called at \(point)")
+    
+    guard let token: RunSessionGuard = .isServerEnabled else { 
+        print("Focus-follows-mouse: Server not enabled, exiting")
+        return 
+    }
 
     // Only block focus-follows-mouse during actual window manipulation (resize/move)
     // rather than any mouse interaction (like clicking in VS Code)
-    guard !isActuallyManipulatingWindow() else { return }
+    guard !isActuallyManipulatingWindow() else { 
+        print("Focus-follows-mouse: Window manipulation detected, skipping")
+        return 
+    }
 
     // Check if we should ignore this mouse position
-    guard !shouldIgnoreMousePosition(point) else { return }
+    guard !shouldIgnoreMousePosition(point) else { 
+        print("Focus-follows-mouse: Position should be ignored (menu bar/dock)")
+        return 
+    }
 
+    print("Focus-follows-mouse: Starting runSession")
     try? await runSession(.focusFollowsMouse, token) {
-        if let windowUnderMouse = findWindowUnderMouse(at: point) {
+        let windowUnderMouse = findWindowUnderMouse(at: point)
+
+        if let windowUnderMouse = windowUnderMouse {
             // Only focus if different from current focus
             if windowUnderMouse.windowId != focus.windowOrNil?.windowId {
+                print("Focus-follows-mouse: Focusing window \(windowUnderMouse.windowId)")
                 lastFocusSource = .mouse
                 _ = windowUnderMouse.focusWindow()
+            } else {
+                print("Focus-follows-mouse: Window \(windowUnderMouse.windowId) already focused")
             }
+        } else {
+            print("Focus-follows-mouse: No window under mouse at \(point)")
         }
+        // Note: We don't actively unfocus when mouse moves to empty space
+        // This preserves the current focus when mouse moves to desktop/empty areas
     }
 }
 

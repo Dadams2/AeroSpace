@@ -13,7 +13,8 @@ struct MacosNativeMinimizeCommand: Command {
         guard let window = target.windowOrNil else {
             return io.err(noWindowIsFocused)
         }
-        let newState: Bool = try await !window.isMacosMinimized
+        let newState: Bool = try await !
+        dwindow.isMacosMinimized
         window.asMacWindow().setNativeMinimized(newState)
         if newState { // minimize
             window.bind(to: macosMinimizedWindowsContainer, adaptiveWeight: 1, index: INDEX_BIND_LAST)

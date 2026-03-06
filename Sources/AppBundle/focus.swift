@@ -78,6 +78,7 @@ extension Window {
     @MainActor func focusWindow() -> Bool {
         if let focus = toLiveFocusOrNil() {
             let result = setFocus(to: focus)
+            print("setFocus result: \(result)")
             if result {
                 // Track keyboard focus for focus-follows-mouse
                 if let rect = lastAppliedLayoutPhysicalRect {
